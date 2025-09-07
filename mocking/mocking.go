@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"iter"
 	"os"
 	"time"
 )
@@ -10,8 +11,18 @@ import (
 const finalWord = "Go!"
 const countdownStart = 3
 
+func countDownFrom(from int) iter.Seq[int] {
+	return func(yield func(int) bool) {
+		for i := from; i > 0; i-- {
+			if !yield(i) {
+				return
+			}
+		}
+	}
+}
+
 func Countdown(out io.Writer, sleeper Sleeper) {
-	for i := countdownStart; i > 0; i-- {
+	for i := range countDownFrom(countdownStart) {
 		fmt.Fprintln(out, i)
 		sleeper.Sleep()
 	}
@@ -23,17 +34,22 @@ type Sleeper interface {
 	Sleep()
 }
 
-type SpySleeper struct {
-	Calls int
+type ConfigurableSleeper struct {
+	duration time.Duration
+	sleep    func(time.Duration)
 }
 
-func (s *SpySleeper) Sleep() { s.Calls++ }
+func (c *ConfigurableSleeper) Sleep() { c.sleep(c.duration) }
 
-type DefaultSleeper struct{}
+type SpyTime struct {
+	durationSlept time.Duration
+}
 
-func (d *DefaultSleeper) Sleep() { time.Sleep(1 * time.Second) }
+func (s *SpyTime) SetDurationSlept(duration time.Duration) {
+	s.durationSlept = duration
+}
 
 func main() {
-	sleeper := &DefaultSleeper{}
+	sleeper := &ConfigurableSleeper{1 * time.Second, time.Sleep}
 	Countdown(os.Stdout, sleeper)
 }
